@@ -1,23 +1,43 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-  const LENDING_ADDRESS = "0x5ac2184d783db06b9dedf80ce9b5b1aeb02392c3";
+  const LOAN_MANAGER_ADDRESS = process.env.LOAN_MANAGER_ADDRESS || "0x";
+
+  if (LOAN_MANAGER_ADDRESS === "0x") {
+    throw new Error("Please set LOAN_MANAGER_ADDRESS in .env");
+  }
 
   const [borrower] = await ethers.getSigners();
   console.log("Borrower:", borrower.address);
 
-  const lending = await ethers.getContractAt(
-    "LendingSystem",
-    LENDING_ADDRESS,
+  const loanManager = await ethers.getContractAt(
+    "LoanManager",
+    LOAN_MANAGER_ADDRESS,
     borrower
   );
 
+  // Get trust score first
+  try {
+    const trustScore = await loanManager.trustScoreContract().then(addr =>
+      ethers.getContractAt("ITrustScore", addr)
+    );
+    const score = await trustScore.getScore(borrower.address);
+    console.log("Trust Score:", score.toString());
+  } catch (e) {
+    console.log("Could not fetch trust score");
+  }
+
+  // Create a loan request
   const amount = ethers.parseEther("0.01");
+  const duration = 7 * 24 * 60 * 60; // 7 days in seconds
 
-  const tx = await lending.borrow(amount);
-  await tx.wait();
+  console.log(`Creating loan request for ${ethers.formatEther(amount)} ETH with ${duration}s duration...`);
 
-  console.log("Borrow successful 💸");
+  const tx = await loanManager.createLoan(amount, duration);
+  const receipt = await tx.wait();
+
+  console.log("✅ Loan request created successfully!");
+  console.log("Transaction hash:", receipt.hash);
 }
 
 main().catch((error) => {

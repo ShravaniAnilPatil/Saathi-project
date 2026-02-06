@@ -8,9 +8,13 @@ interface ITrustScore {
 contract LoanManager {
 
     ITrustScore public trustScoreContract;
+    address public admin;
+    uint256 public minTrustScore;
 
     constructor(address _trustScoreAddress) {
         trustScoreContract = ITrustScore(_trustScoreAddress);
+        admin = msg.sender;
+        minTrustScore = 40; // Default minimum trust score
     }
 
     struct Loan {
@@ -30,6 +34,15 @@ contract LoanManager {
     event LoanFunded(uint256 loanId, address lender);
     event LoanWithdrawn(uint256 loanId);
     event LoanRepaid(uint256 loanId);
+    event MinTrustScoreUpdated(uint256 newScore);
+
+    // Admin function to update minimum trust score
+    function setMinTrustScore(uint256 _minScore) public {
+        require(msg.sender == admin, "Only admin can set minimum trust score");
+        require(_minScore <= 100, "Score must be 0-100");
+        minTrustScore = _minScore;
+        emit MinTrustScoreUpdated(_minScore);
+    }
 
     // ------------------------------
     // BORROWER CREATES LOAN REQUEST
@@ -37,7 +50,7 @@ contract LoanManager {
     function createLoan(uint256 amount, uint256 duration) public {
 
         uint256 score = trustScoreContract.getScore(msg.sender);
-        require(score >= 40, "Trust score too low");
+        require(score >= minTrustScore, "Trust score too low");
 
         loans.push(
             Loan({
@@ -100,10 +113,12 @@ contract LoanManager {
         require(loan.withdrawn, "Loan not withdrawn");
         require(!loan.repaid, "Already repaid");
         require(msg.value == loan.amount, "Incorrect repayment");
+        require(loan.lender != address(0), "Invalid lender address");
+
+        // Transfer to lender first, then mark as repaid
+        payable(loan.lender).transfer(msg.value);
 
         loan.repaid = true;
-
-        payable(loan.lender).transfer(msg.value);
 
         emit LoanRepaid(loanId);
     }

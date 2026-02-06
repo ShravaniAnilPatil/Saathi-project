@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import LoanManagerJSON from "../abi/LoanManager.json";
 
 
-const CONTRACT_ADDRESS = "0x736C06E0d2f09fC1cf34DDaAA037D18b049170f3";
+const CONTRACT_ADDRESS = "0x6f571eF7FbdbFD17B58FCd45C71b978A7D507572";
 
 export default function BorrowForm() {
 
