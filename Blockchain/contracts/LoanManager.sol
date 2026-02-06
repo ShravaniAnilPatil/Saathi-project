@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 interface ITrustScore {
     function getScore(address user) external view returns (uint256);
+    function updateScore(address user, uint256 score) external;
 }
 
 contract LoanManager {
@@ -10,6 +11,10 @@ contract LoanManager {
     ITrustScore public trustScoreContract;
     address public admin;
     uint256 public minTrustScore;
+    
+    // Trust score rewards/penalties
+    uint256 public repaymentBonus = 5;       // +5 points for successful repayment
+    uint256 public defaultPenalty = 10;      // -10 points for defaulted loan
 
     constructor(address _trustScoreAddress) {
         trustScoreContract = ITrustScore(_trustScoreAddress);
@@ -27,6 +32,7 @@ contract LoanManager {
         bool funded;
         bool repaid;
         bool withdrawn;
+        bool defaulted;
     }
 
     Loan[] public loans;
@@ -35,6 +41,9 @@ contract LoanManager {
     event LoanFunded(uint256 loanId, address lender);
     event LoanWithdrawn(uint256 loanId);
     event LoanRepaid(uint256 loanId, uint256 totalRepaid, uint256 interest);
+    event LoanDefaulted(uint256 loanId, address borrower);
+    event TrustScoreIncreased(address borrower, uint256 amount);
+    event TrustScoreDecreased(address borrower, uint256 amount);
     event MinTrustScoreUpdated(uint256 newScore);
 
     // Calculate interest rate based on trust score
@@ -62,6 +71,45 @@ contract LoanManager {
         emit MinTrustScoreUpdated(_minScore);
     }
 
+    // Set trust score reward for repayment
+    function setRepaymentBonus(uint256 _bonus) public {
+        require(msg.sender == admin, "Only admin");
+        repaymentBonus = _bonus;
+    }
+
+    // Set trust score penalty for default
+    function setDefaultPenalty(uint256 _penalty) public {
+        require(msg.sender == admin, "Only admin");
+        defaultPenalty = _penalty;
+    }
+
+    // Check if a loan is overdue
+    function isLoanOverdue(uint256 loanId) public view returns (bool) {
+        Loan memory loan = loans[loanId];
+        if (!loan.withdrawn || loan.repaid || loan.defaulted) {
+            return false;
+        }
+        return block.timestamp > loan.createdAt + loan.duration;
+    }
+
+    // Mark loan as defaulted (called by admin or lender)
+    function markLoanDefaulted(uint256 loanId) public {
+        Loan storage loan = loans[loanId];
+        require(!loan.defaulted && !loan.repaid, "Loan already finalized");
+        require(isLoanOverdue(loanId), "Loan is not overdue");
+        require(msg.sender == loan.lender || msg.sender == admin, "Only lender or admin can mark default");
+
+        loan.defaulted = true;
+
+        // Decrease borrower's trust score
+        uint256 currentScore = trustScoreContract.getScore(loan.borrower);
+        uint256 newScore = currentScore > defaultPenalty ? currentScore - defaultPenalty : 0;
+        trustScoreContract.updateScore(loan.borrower, newScore);
+
+        emit LoanDefaulted(loanId, loan.borrower);
+        emit TrustScoreDecreased(loan.borrower, defaultPenalty);
+    }
+
     // ------------------------------
     // BORROWER CREATES LOAN REQUEST
     // ------------------------------
@@ -82,7 +130,8 @@ contract LoanManager {
                 createdAt: block.timestamp,
                 funded: false,
                 repaid: false,
-                withdrawn: false
+                withdrawn: false,
+                defaulted: false
             })
         );
 
@@ -133,6 +182,7 @@ contract LoanManager {
         require(msg.sender == loan.borrower, "Not borrower");
         require(loan.withdrawn, "Loan not withdrawn");
         require(!loan.repaid, "Already repaid");
+        require(!loan.defaulted, "Loan is defaulted");
         require(loan.lender != address(0), "Invalid lender address");
 
         // Calculate total repayment (principal + interest)
@@ -147,7 +197,15 @@ contract LoanManager {
 
         loan.repaid = true;
 
+        // Increase borrower's trust score for successful repayment
+        uint256 currentScore = trustScoreContract.getScore(loan.borrower);
+        uint256 newScore = currentScore + repaymentBonus;
+        // Cap at 100
+        if (newScore > 100) newScore = 100;
+        trustScoreContract.updateScore(loan.borrower, newScore);
+
         emit LoanRepaid(loanId, totalRepayment, interest);
+        emit TrustScoreIncreased(loan.borrower, repaymentBonus);
 
         // Return excess payment if any
         if (msg.value > totalRepayment) {

@@ -23,6 +23,11 @@ async function main() {
   const loanManagerAddress = await loanManager.getAddress();
   console.log("LoanManager deployed to:", loanManagerAddress);
 
+  // Set LoanManager address in TrustScore contract
+  console.log("Setting LoanManager address in TrustScore...");
+  await trustScore.setLoanManagerAddress(loanManagerAddress);
+  console.log("✅ LoanManager address set in TrustScore");
+
   console.log("\n📝 Update your .env with:");
   console.log(`TRUST_SCORE_ADDRESS=${trustScoreAddress}`);
   console.log(`LOAN_MANAGER_ADDRESS=${loanManagerAddress}`);

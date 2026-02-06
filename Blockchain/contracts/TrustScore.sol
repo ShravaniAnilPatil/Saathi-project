@@ -5,15 +5,22 @@ contract TrustScore {
     // Store trust scores for each user
     mapping(address => uint256) public trustScores;
     address public admin;
+    address public loanManagerAddress;
     uint256 public initialScore = 50; // Initial score for new users
     
     constructor() {
         admin = msg.sender;
     }
     
-    // Only admin can update scores
-    function updateScore(address user, uint256 score) public {
+    // Set LoanManager address (admin only)
+    function setLoanManagerAddress(address _loanManagerAddress) public {
         require(msg.sender == admin, "Only admin");
+        loanManagerAddress = _loanManagerAddress;
+    }
+    
+    // Admin or LoanManager can update scores
+    function updateScore(address user, uint256 score) public {
+        require(msg.sender == admin || msg.sender == loanManagerAddress, "Only admin or LoanManager");
         require(score <= 100, "Score must be 0-100");
         trustScores[user] = score;
     }
