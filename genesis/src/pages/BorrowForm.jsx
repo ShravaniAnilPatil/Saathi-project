@@ -65,10 +65,11 @@ export default function TestBorrowPage() {
 
   // 🔹 Interest Rate Logic (example)
   const calculateInterestRate = (score) => {
-    if (score >= 80) setInterestRate("5%");
+    if (score >= 90) setInterestRate("3%");
+    else if (score >= 75) setInterestRate("5%");
     else if (score >= 60) setInterestRate("8%");
-    else if (score >= 40) setInterestRate("12%");
-    else setInterestRate("Not eligible");
+    else if (score >= 50) setInterestRate("12%");
+    else setInterestRate("15%");
   };
 
   // 🔹 Request Loan
