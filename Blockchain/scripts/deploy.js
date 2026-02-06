@@ -1,18 +1,10 @@
 async function main() {
-  // Deploy TrustScore first
-  const TrustScore = await ethers.getContractFactory("TrustScore");
-  const trustScore = await TrustScore.deploy();
-  await trustScore.waitForDeployment();
+  const Lending = await ethers.getContractFactory("Lending");
+  const lending = await Lending.deploy();
 
-  const trustScoreAddress = await trustScore.getAddress();
-  console.log("TrustScore deployed to:", trustScoreAddress);
+  await lending.waitForDeployment();
 
-  // Deploy LendingPool with TrustScore address
-  const LendingPool = await ethers.getContractFactory("LendingPool");
-  const lendingPool = await LendingPool.deploy(trustScoreAddress);
-  await lendingPool.waitForDeployment();
-
-  console.log("LendingPool deployed to:", await lendingPool.getAddress());
+  console.log("Lending deployed to:", await lending.getAddress());
 }
 
 main().catch((error) => {
