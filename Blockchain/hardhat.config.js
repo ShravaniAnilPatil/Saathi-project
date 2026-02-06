@@ -9,4 +9,10 @@ module.exports = {
       accounts: [process.env.PRIVATE_KEY],
     },
   },
+  sourcify: {
+    enabled: true
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY,
+  }
 };
