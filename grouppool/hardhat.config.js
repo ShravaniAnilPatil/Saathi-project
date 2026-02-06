@@ -16,3 +16,10 @@ module.exports = {
     apiKey: process.env.ETHERSCAN_API_KEY,
   }
 };
+
+require("@nomicfoundation/hardhat-toolbox");
+
+/** @type import('hardhat/config').HardhatUserConfig */
+module.exports = {
+  solidity: "0.8.28",
+};

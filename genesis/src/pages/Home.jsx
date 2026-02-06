@@ -91,10 +91,15 @@ useEffect(() => {
         getWalletTransactions(walletAddress),
       ]);
 
+      console.log("Fetched wei:", wei);
+      console.log("Fetched txs:", txs); // should be 69 items
+
       setBalance((Number(wei) / 1e18).toFixed(4));
-      setTransactions(txs);
+      setTransactions(txs); // ✅ directly set array
     } catch (err) {
-      console.error(err);
+      console.error("Wallet fetch error:", err);
+      setBalance("0.0000");
+      setTransactions([]);
     } finally {
       setLoadingTx(false);
     }
@@ -102,6 +107,7 @@ useEffect(() => {
 
   fetchWalletData();
 }, [walletAddress]);
+
 
 console.log(transactions)
 // useEffect(() => {
@@ -170,7 +176,10 @@ useEffect(() => {
 
         {/* Right Section */}
         <div className="hidden md:flex items-center gap-6 text-sm">
-          <button className="flex items-center gap-2 text-slate-400 hover:text-white">
+          <button
+            className="flex items-center gap-2 text-slate-400 hover:text-white"
+            onClick={() => navigate("/grouppool")}
+          >
             <Users size={18} /> GroupPool
           </button>
           <button className="flex items-center gap-2 text-slate-400 hover:text-white">

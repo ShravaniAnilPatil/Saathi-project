@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-
+import GroupPoolPage from "./pages/GroupPoolPage";
 import LandingPage from "./pages/LandingPage";
 import Home from "./pages/Home";
 // import TestBorrowPage from "./pages/TestBorrowPage";
@@ -24,7 +24,7 @@ function App() {
           }
         />
          <Route path="/test-borrow" element={<TestBorrowPage />} />
-
+        <Route path="/grouppool" element={<GroupPoolPage walletAddress={walletAddress} />} />
         <Route
           path="/dashboard"
           element={<Home walletAddress={walletAddress} />}
