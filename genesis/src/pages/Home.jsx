@@ -41,42 +41,65 @@ const Dashboard = ({ walletAddress }) => {
 const [loadingTx, setLoadingTx] = useState(true);
 const [balance, setBalance] = useState(null);
 
-  useEffect(() => {
-  if (!walletAddress) return;
+  // useEffect(() => {
+  // if (!walletAddress) return;
 
-  const fetchBalance = async () => {
-    try {
-      const wei = await getWalletBalance(walletAddress);
-      console.log("first")
-const eth = (Number(wei) / 1e18).toFixed(4);
-console.log("second")
-setBalance(eth);
+//   const fetchBalance = async () => {
+//     try {
+//       const wei = await getWalletBalance(walletAddress);
+//       console.log("first")
+// const eth = (Number(wei) / 1e18).toFixed(4);
+// console.log("second")
+// setBalance(eth);
 
-    } catch (err) {
-      console.error("Balance fetch failed:", err);
-      setBalance("0.0000");
-    }
-  };
+//     } catch (err) {
+//       console.error("Balance fetch failed:", err);
+//       setBalance("0.0000");
+//     }
+//   };
 
-  fetchBalance();
-}, [walletAddress]);
+//   fetchBalance();
+// }, [walletAddress]);
 
 
+// useEffect(() => {
+//   if (!walletAddress) return;
+
+//   const fetchTransactions = async () => {
+//     setLoadingTx(true);
+
+//     const txs = await getWalletTransactions(walletAddress);
+
+//     console.log("Transactions received in component:", txs);
+
+//     setTransactions(txs); // ✅ ALL transactions stored here
+//     setLoadingTx(false);
+//   };
+
+//   fetchTransactions();
+// }, [walletAddress]);
 useEffect(() => {
   if (!walletAddress) return;
 
-  const fetchTransactions = async () => {
-    setLoadingTx(true);
+  const fetchWalletData = async () => {
+    try {
+      setLoadingTx(true);
 
-    const txs = await getWalletTransactions(walletAddress);
+      const [wei, txs] = await Promise.all([
+        getWalletBalance(walletAddress),
+        getWalletTransactions(walletAddress),
+      ]);
 
-    console.log("Transactions received in component:", txs);
-
-    setTransactions(txs); // ✅ ALL transactions stored here
-    setLoadingTx(false);
+      setBalance((Number(wei) / 1e18).toFixed(4));
+      setTransactions(txs);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingTx(false);
+    }
   };
 
-  fetchTransactions();
+  fetchWalletData();
 }, [walletAddress]);
 
 console.log(transactions)
@@ -99,14 +122,13 @@ useEffect(() => {
   if (!window.ethereum) return;
 
   const handleAccountsChanged = (accounts) => {
-    if (accounts.length > 0) {
-      window.location.href = "/dashboard";
-    }
+    console.log("Accounts changed:", accounts);
+    // let parent handle walletAddress
   };
 
   const handleChainChanged = () => {
-    // just refetch, no reload
-    window.location.href = "/dashboard";
+    console.log("Chain changed");
+    // refetch happens automatically via walletAddress effect
   };
 
   window.ethereum.on("accountsChanged", handleAccountsChanged);
@@ -119,19 +141,6 @@ useEffect(() => {
 }, []);
 
 
-useEffect(() => {
-  if (!window.ethereum) return;
-
-  const handleAccountsChanged = () => {
-    window.location.reload();
-  };
-
-  window.ethereum.on("accountsChanged", handleAccountsChanged);
-
-  return () => {
-    window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
-  };
-}, []);
 
 
 
@@ -139,7 +148,9 @@ useEffect(() => {
   // 🔒 Redirect if wallet not connected
   useEffect(() => {
     if (!walletAddress) {
-      navigate("/");
+      <div className="min-h-screen bg-[#020617] text-slate-200 flex items-center justify-center">
+      <p>Wallet not connected</p>
+    </div>
     }
   }, [walletAddress, navigate]);
 
