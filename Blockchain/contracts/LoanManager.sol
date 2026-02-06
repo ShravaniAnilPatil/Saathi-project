@@ -14,13 +14,14 @@ contract LoanManager {
     constructor(address _trustScoreAddress) {
         trustScoreContract = ITrustScore(_trustScoreAddress);
         admin = msg.sender;
-        minTrustScore = 50; // Default minimum trust score
+        minTrustScore = 40; // Default minimum trust score
     }
 
     struct Loan {
         address borrower;
         address lender;
         uint256 amount;
+        uint256 interestRate; // Interest rate in basis points (e.g., 500 = 5%)
         uint256 duration;
         uint256 createdAt;
         bool funded;
@@ -30,11 +31,28 @@ contract LoanManager {
 
     Loan[] public loans;
 
-    event LoanRequested(uint256 loanId, address borrower, uint256 amount);
+    event LoanRequested(uint256 loanId, address borrower, uint256 amount, uint256 interestRate);
     event LoanFunded(uint256 loanId, address lender);
     event LoanWithdrawn(uint256 loanId);
-    event LoanRepaid(uint256 loanId);
+    event LoanRepaid(uint256 loanId, uint256 totalRepaid, uint256 interest);
     event MinTrustScoreUpdated(uint256 newScore);
+
+    // Calculate interest rate based on trust score
+    // Higher trust score = lower interest rate
+    function getInterestRate(uint256 trustScore) public pure returns (uint256) {
+        if (trustScore >= 90) return 300;      // 3% for excellent credit
+        if (trustScore >= 75) return 500;      // 5% for good credit
+        if (trustScore >= 60) return 800;      // 8% for fair credit
+        if (trustScore >= 50) return 1200;     // 12% for poor credit
+        return 1500;                           // 15% for very poor credit
+    }
+
+    // Calculate total repayment amount (principal + interest)
+    function calculateRepayment(uint256 loanId) public view returns (uint256) {
+        Loan memory loan = loans[loanId];
+        uint256 interest = (loan.amount * loan.interestRate) / 10000;
+        return loan.amount + interest;
+    }
 
     // Admin function to update minimum trust score
     function setMinTrustScore(uint256 _minScore) public {
@@ -50,13 +68,16 @@ contract LoanManager {
     function createLoan(uint256 amount, uint256 duration) public {
 
         uint256 score = trustScoreContract.getScore(msg.sender);
-        require(score <= minTrustScore, "Trust score too low");
+        require(score >= minTrustScore, "Trust score too low");
+
+        uint256 interestRate = getInterestRate(score);
 
         loans.push(
             Loan({
                 borrower: msg.sender,
                 lender: address(0),
                 amount: amount,
+                interestRate: interestRate,
                 duration: duration,
                 createdAt: block.timestamp,
                 funded: false,
@@ -65,7 +86,7 @@ contract LoanManager {
             })
         );
 
-        emit LoanRequested(loans.length - 1, msg.sender, amount);
+        emit LoanRequested(loans.length - 1, msg.sender, amount, interestRate);
     }
 
     // ------------------------------
@@ -112,15 +133,26 @@ contract LoanManager {
         require(msg.sender == loan.borrower, "Not borrower");
         require(loan.withdrawn, "Loan not withdrawn");
         require(!loan.repaid, "Already repaid");
-        require(msg.value == loan.amount, "Incorrect repayment");
         require(loan.lender != address(0), "Invalid lender address");
 
+        // Calculate total repayment (principal + interest)
+        uint256 totalRepayment = calculateRepayment(loanId);
+        require(msg.value >= totalRepayment, "Insufficient repayment amount");
+
+        // Calculate interest amount
+        uint256 interest = totalRepayment - loan.amount;
+
         // Transfer to lender first, then mark as repaid
-        payable(loan.lender).transfer(msg.value);
+        payable(loan.lender).transfer(totalRepayment);
 
         loan.repaid = true;
 
-        emit LoanRepaid(loanId);
+        emit LoanRepaid(loanId, totalRepayment, interest);
+
+        // Return excess payment if any
+        if (msg.value > totalRepayment) {
+            payable(msg.sender).transfer(msg.value - totalRepayment);
+        }
     }
 
     // ------------------------------

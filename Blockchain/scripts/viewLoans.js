@@ -24,7 +24,8 @@ async function main() {
     console.log(`\nLoan ID: ${index}`);
     console.log(`  Borrower: ${loan.borrower}`);
     console.log(`  Lender: ${loan.lender}`);
-    console.log(`  Amount: ${ethers.formatEther(loan.amount)} ETH`);
+    console.log(`  Principal: ${ethers.formatEther(loan.amount)} ETH`);
+    console.log(`  Interest Rate: ${(Number(loan.interestRate) / 100).toFixed(2)}%`);
     console.log(`  Duration: ${loan.duration} seconds`);
     console.log(`  Created: ${new Date(Number(loan.createdAt) * 1000).toLocaleString()}`);
     console.log(`  Funded: ${loan.funded}`);

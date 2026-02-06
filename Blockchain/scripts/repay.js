@@ -45,7 +45,8 @@ async function main() {
     // Get loan details
     const loan = await loanManager.loans(loanId);
     console.log("Loan details:");
-    console.log("  - Amount:", ethers.formatEther(loan.amount), "ETH");
+    console.log("  - Principal Amount:", ethers.formatEther(loan.amount), "ETH");
+    console.log("  - Interest Rate:", (Number(loan.interestRate) / 100).toFixed(2), "%");
     console.log("  - Funded:", loan.funded);
     console.log("  - Withdrawn:", loan.withdrawn);
     console.log("  - Repaid:", loan.repaid);
@@ -58,10 +59,19 @@ async function main() {
       throw new Error("This loan has not been withdrawn yet");
     }
 
+    // Calculate total repayment amount (principal + interest)
+    const totalRepayment = await loanManager.calculateRepayment(loanId);
+    const interest = totalRepayment - loan.amount;
+    
+    console.log("\nRepayment Breakdown:");
+    console.log("  - Principal:", ethers.formatEther(loan.amount), "ETH");
+    console.log("  - Interest:", ethers.formatEther(interest), "ETH");
+    console.log("  - Total to Repay:", ethers.formatEther(totalRepayment), "ETH");
+
     // Repay the loan
     console.log("\nRepaying loan...");
     const tx = await loanManager.repayLoan(loanId, {
-      value: loan.amount,
+      value: totalRepayment,
     });
 
     const receipt = await tx.wait();
