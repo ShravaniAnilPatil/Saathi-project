@@ -1,10 +1,20 @@
 import React from 'react';
 import { Shield, TrendingUp, Users, Award, Wallet, ArrowUpRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { connectWallet } from "../utils/metamask";
 
-const LandingPage = () => {
+const LandingPage = ({ walletAddress, setWalletAddress }) => {
   const navigate = useNavigate();
   const bgImage = "https://static.vecteezy.com/system/resources/thumbnails/001/925/480/small/business-graph-chart-of-stock-market-investment-on-blue-background-vector.jpg";
+
+  const handleConnectWallet = async () => {
+  const wallet = await connectWallet();
+  if (wallet) {
+    setWalletAddress(wallet.address);
+    navigate("/dashboard"); 
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-[#020617] text-slate-200 font-sans selection:bg-slate-700">
@@ -53,9 +63,14 @@ const LandingPage = () => {
           </p>
           
           <div className="flex flex-wrap gap-4 justify-center">
-            <button className="px-8 py-4 bg-slate-100 text-slate-900 font-bold rounded-lg hover:bg-white transition-all flex items-center gap-2">
-              Get Started <ArrowUpRight size={18} />
-            </button>
+            <button
+  onClick={handleConnectWallet}
+  className="px-8 py-4 bg-slate-100 text-slate-900 font-bold rounded-lg hover:bg-white transition-all flex items-center gap-2"
+>
+  {walletAddress ? "Go to Dashboard" : "Get Started"}
+  <ArrowUpRight size={18} />
+</button>
+
             <button className="px-8 py-4 bg-transparent border border-slate-700 text-slate-300 font-bold rounded-lg hover:bg-slate-900/50 transition-all">
               Join a Group Pool
             </button>
@@ -109,9 +124,16 @@ const LandingPage = () => {
             <h2 className="text-2xl font-bold mb-2">Build your digital legacy.</h2>
             <p className="text-slate-500">Secure. Decentralized. Human-centric.</p>
           </div>
-          <button className="whitespace-nowrap px-8 py-3 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl transition-all flex items-center gap-3">
-            <Wallet size={20} /> Connect Wallet
-          </button>
+          <button
+  onClick={handleConnectWallet}
+  className="whitespace-nowrap px-8 py-3 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-xl transition-all flex items-center gap-3"
+>
+  <Wallet size={20} />
+  {walletAddress
+    ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+    : "Connect Wallet"}
+</button>
+
         </div>
       </section>
 

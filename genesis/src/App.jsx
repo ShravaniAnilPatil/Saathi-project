@@ -1,31 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-import Home from "./pages/Home.jsx";
-import LandingPage from "./pages/LandingPage.jsx";
-import { checkWalletConnected } from "./utils/metamask";
+import LandingPage from "./pages/LandingPage";
+import Home from "./pages/Home";
 
 function App() {
-  const [walletAddress, setWalletAddress] = useState("");
-
-  useEffect(() => {
-    const initWallet = async () => {
-      const address = await checkWalletConnected();
-      if (address) setWalletAddress(address);
-    };
-
-    initWallet();
-
-    if (window.ethereum) {
-      window.ethereum.on("accountsChanged", (accounts) => {
-        setWalletAddress(accounts.length > 0 ? accounts[0] : "");
-      });
-
-      window.ethereum.on("chainChanged", () => {
-        window.location.reload();
-      });
-    }
-  }, []);
+  // ✅ COMMON STATE (THIS WAS MISSING)
+  const [walletAddress, setWalletAddress] = useState(null);
 
   return (
     <BrowserRouter>
@@ -39,6 +20,7 @@ function App() {
             />
           }
         />
+
         <Route
           path="/dashboard"
           element={<Home walletAddress={walletAddress} />}
