@@ -1,3 +1,5 @@
+import { BrowserProvider } from "ethers";
+
 export const connectWallet = async () => {
   if (!window.ethereum) {
     alert("MetaMask not installed");
@@ -9,14 +11,14 @@ export const connectWallet = async () => {
       method: "eth_requestAccounts",
     });
 
-    const walletData = {
+    const provider = new BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+
+    return {
       address: accounts[0],
+      provider,
+      signer,
     };
-
-    // ✅ Store wallet address in localStorage
-    localStorage.setItem("walletAddress", accounts[0]);
-
-    return walletData;
 
   } catch (error) {
     console.error("Wallet connection error:", error);

@@ -11,6 +11,7 @@ contract TrustScore {
     }
     
     // Only admin can update scores
+    
     function updateScore(address user, uint256 score) public {
         require(msg.sender == admin, "Only admin");
         require(score <= 100, "Score must be 0-100");
