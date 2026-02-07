@@ -3,92 +3,12 @@ import { ethers } from "ethers";
 import LoanManagerJSON from "../abi/LoanManager.json";
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_LOAN_MANAGER_ADDRESS;
-const TRUST_SCORE_ADDRESS = import.meta.env.VITE_TRUST_SCORE_ADDRESS;
 
 export default function OpenLoanRequests() {
   const [loans, setLoans] = useState([]);
   const [loading, setLoading] = useState(true);
-
-const styles = {
-    containerr: {
-        height: "100vh",
-        backgroundColor: "#0f172a", // Dark Blue-Gray
-    },
-    container: {
-      marginTop: "40px",
-      padding: "24px",
-      backgroundColor: "#050a14", // Deep Black/Blue
-      borderRadius: "16px",
-      color: "#e2e8f0",
-      fontFamily: "'Inter', sans-serif",
-      boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
-      border: "1px solid #1e293b"
-    },
-    header: {
-      fontSize: "24px",
-      fontWeight: "600",
-      marginBottom: "20px",
-      color: "#60a5fa", // Bright Blue accent
-      letterSpacing: "-0.025em"
-    },
-    table: {
-      width: "100%",
-      borderCollapse: "separate",
-      borderSpacing: "0 8px",
-      textAlign: "left"
-    },
-    th: {
-      padding: "12px 16px",
-      color: "#94a3b8",
-      fontSize: "13px",
-      textTransform: "uppercase",
-      fontWeight: "700",
-      borderBottom: "1px solid #1e293b"
-    },
-    tr: {
-      backgroundColor: "#0f172a", // Dark Blue-Gray
-      transition: "transform 0.2s ease",
-    },
-    td: {
-      padding: "16px",
-      fontSize: "14px",
-      borderTop: "1px solid #1e293b",
-      borderBottom: "1px solid #1e293b"
-    },
-    address: {
-      fontFamily: "monospace",
-      backgroundColor: "#1e293b",
-      padding: "4px 8px",
-      borderRadius: "6px",
-      color: "#38bdf8"
-    },
-    badge: (status) => ({
-      padding: "4px 10px",
-      borderRadius: "12px",
-      fontSize: "12px",
-      fontWeight: "600",
-      backgroundColor: status === 'Active' ? "#064e3b" : "#1e293b",
-      color: status === 'Active' ? "#34d399" : "#94a3b8",
-      border: `1px solid ${status === 'Active' ? "#059669" : "#334155"}`
-    }),
-    btn: (bg) => ({
-      padding: "8px 16px",
-      borderRadius: "8px",
-      border: "none",
-      cursor: "pointer",
-      fontWeight: "600",
-      fontSize: "13px",
-      transition: "opacity 0.2s",
-      backgroundColor: bg,
-      color: "white",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
-    }),
-    emptyState: {
-      textAlign: "center",
-      padding: "40px",
-      color: "#64748b"
-    }
-  };
+  const [showLendingModal, setShowLendingModal] = useState(false);
+  const [selectedLoan, setSelectedLoan] = useState(null);
 
   useEffect(() => {
     loadLoans();
@@ -109,49 +29,24 @@ const styles = {
         provider
       );
 
-      // ✅ EXACT SAME AS HARDHAT SCRIPT
       const rawLoans = await loanManager.getLoans();
 
-      // Fetch trust scores for all unique borrowers
-      const trustScoreContract = new ethers.Contract(
-        TRUST_SCORE_ADDRESS,
-        ["function getScore(address) view returns (uint256)"],
-        provider
-      );
-
-      const formattedLoans = await Promise.all(
-        rawLoans
-          .filter((loan) => loan.borrower !== ethers.ZeroAddress && !loan.funded) // Only show UNFUNDED loans
-          .map(async (loan, index) => {
-            // Fetch trust score for this borrower
-            const trustScore = await trustScoreContract.getScore(loan.borrower);
-            
-            // Find original index in rawLoans array
-            const originalIndex = rawLoans.findIndex((l, i) => 
-              l.borrower === loan.borrower && 
-              l.amount === loan.amount && 
-              l.createdAt === loan.createdAt
-            );
-            
-            return {
-              loanId: originalIndex,
-              borrower: loan.borrower,
-              lender: loan.lender,
-              amountWei: loan.amount,
-              amountEth: ethers.formatEther(loan.amount),
-              interestRate: (Number(loan.interestRate) / 100).toFixed(2),
-              safetyFee: (Number(loan.safetyFee) / 100).toFixed(2),
-              duration: Number(loan.duration),
-              createdAt: new Date(Number(loan.createdAt) * 1000).toLocaleString(),
-              funded: loan.funded,
-              repaid: loan.repaid,
-              withdrawn: loan.withdrawn,
-              defaulted: loan.defaulted,
-              trustScore: Number(trustScore),
-            };
-          })
-      );
-
+      const formattedLoans = rawLoans
+        .filter((loan) => loan.borrower !== ethers.ZeroAddress)
+        .map((loan, index) => ({
+          loanId: index,
+          borrower: loan.borrower,
+          lender: loan.lender,
+          amountWei: loan.amount,
+          amountEth: ethers.formatEther(loan.amount),
+          interestRate: (Number(loan.interestRate) / 100).toFixed(2),
+          duration: Number(loan.duration),
+          createdAt: new Date(Number(loan.createdAt) * 1000).toLocaleString(),
+          funded: loan.funded,
+          repaid: loan.repaid,
+          withdrawn: loan.withdrawn,
+          defaulted: loan.defaulted,
+        }));
 
       setLoans(formattedLoans);
       console.log("Formatted loans:", formattedLoans);
@@ -162,8 +57,17 @@ const styles = {
     }
   };
 
-  // 🔥 LEND FUNCTION
-  const lendLoan = async (loan) => {
+  const openLendingModal = (loan) => {
+    setSelectedLoan(loan);
+    setShowLendingModal(true);
+  };
+
+  const closeLendingModal = () => {
+    setShowLendingModal(false);
+    setSelectedLoan(null);
+  };
+
+  const lendIndividually = async (loan) => {
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
@@ -174,15 +78,15 @@ const styles = {
         signer
       );
 
-      const tx = await loanManager.fundLoan(
-        loan.loanId,
-        { value: loan.amountWei }
-      );
+      const tx = await loanManager.fundLoan(loan.loanId, {
+        value: loan.amountWei,
+      });
 
       console.log("Transaction sent:", tx.hash);
       await tx.wait();
 
-      alert("✅ Loan funded successfully! Check your dashboard to manage this loan.");
+      alert("✅ Loan funded individually!");
+      closeLendingModal();
       loadLoans();
     } catch (err) {
       console.error(err);
@@ -190,90 +94,305 @@ const styles = {
     }
   };
 
-  // Helper to get loan status text
+  const lendViaSafetyPool = async (loan) => {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+
+      const loanManager = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        LoanManagerJSON.abi,
+        signer
+      );
+
+      // ⚠️ THIS FUNCTION NEEDS TO BE ADDED TO YOUR SMART CONTRACT
+      const tx = await loanManager.fundLoanFromPool(loan.loanId, {
+        value: loan.amountWei,
+      });
+
+      console.log("Safety Pool Transaction sent:", tx.hash);
+      await tx.wait();
+
+      alert("✅ Loan funded via Safety Pool!");
+      closeLendingModal();
+      loadLoans();
+    } catch (err) {
+      console.error(err);
+      alert(
+        err.reason ||
+          "Transaction failed. Make sure the smart contract has fundLoanFromPool() function."
+      );
+    }
+  };
+
+  const withdrawLoan = async (loan) => {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const userAddress = await signer.getAddress();
+
+      if (userAddress.toLowerCase() !== loan.borrower.toLowerCase()) {
+        alert("❌ Only the borrower can withdraw this loan.");
+        return;
+      }
+
+      const loanManager = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        LoanManagerJSON.abi,
+        signer
+      );
+
+      const tx = await loanManager.withdrawLoan(loan.loanId);
+      console.log("Withdraw transaction sent:", tx.hash);
+      await tx.wait();
+
+      alert("✅ Funds withdrawn successfully!");
+      loadLoans();
+    } catch (err) {
+      console.error(err);
+      alert(err.reason || "Transaction failed");
+    }
+  };
+
+  const repayLoan = async (loan) => {
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      const userAddress = await signer.getAddress();
+
+      if (userAddress.toLowerCase() !== loan.borrower.toLowerCase()) {
+        alert("❌ Only the borrower can repay this loan.");
+        return;
+      }
+
+      const loanManager = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        LoanManagerJSON.abi,
+        signer
+      );
+
+      const repaymentAmount = await loanManager.calculateRepayment(
+        loan.loanId
+      );
+      const tx = await loanManager.repayLoan(loan.loanId, {
+        value: repaymentAmount,
+      });
+      console.log("Repay transaction sent:", tx.hash);
+      await tx.wait();
+
+      alert("✅ Loan repaid successfully!");
+      loadLoans();
+    } catch (err) {
+      console.error(err);
+      alert(err.reason || "Transaction failed");
+    }
+  };
+
   const getLoanStatus = (loan) => {
+    if (loan.repaid) return "Repaid";
+    if (loan.withdrawn) return "Active";
+    if (loan.funded) return "Funded (Withdraw)";
     return "Requested";
   };
 
   return (
-    <div className="containerr">
-    <div style={styles.container}>
-      <h2 style={styles.header}>Open Loan Requests (Global)</h2>
+    <div className="min-h-screen bg-slate-900">
+      <div className="mt-10 p-6 bg-slate-950 rounded-2xl text-slate-200 font-sans shadow-2xl border border-slate-800 max-w-7xl mx-auto">
+        <h2 className="text-2xl font-semibold mb-5 text-blue-400 tracking-tight">
+          Open Loan Requests (Global)
+        </h2>
 
-      {loading ? (
-        <div style={styles.emptyState}>
-          <div className="spinner">Loading loans...</div>
-        </div>
-      ) : loans.length === 0 ? (
-        <p style={styles.emptyState}>No loan requests found in the smart contract.</p>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Loan ID</th>
-                <th style={styles.th}>Borrower</th>
-                <th style={styles.th}>Trust Score</th>
-                <th style={styles.th}>Amount</th>
-                <th style={styles.th}>Interest</th>
-                <th style={styles.th}>Safety Fee</th>
-                <th style={styles.th}>Duration</th>
-                <th style={styles.th}>Status</th>
-                <th style={{ ...styles.th, textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loans.map((loan) => (
-                <tr key={loan.loanId} style={styles.tr}>
-                  <td style={{ ...styles.td, borderLeft: "1px solid #1e293b", borderTopLeftRadius: "8px", borderBottomLeftRadius: "8px" }}>
-                    #{loan.loanId}
-                  </td>
-                  <td style={styles.td}>
-                    <span style={styles.address}>
-                      {loan.borrower.slice(0, 6)}...{loan.borrower.slice(-4)}
-                    </span>
-                  </td>
-                  <td style={styles.td}>
-                    <span style={{
-                      padding: "4px 10px",
-                      borderRadius: "12px",
-                      fontSize: "12px",
-                      fontWeight: "700",
-                      backgroundColor: loan.trustScore >= 75 ? "#064e3b" : loan.trustScore >= 50 ? "#854d0e" : "#7f1d1d",
-                      color: loan.trustScore >= 75 ? "#34d399" : loan.trustScore >= 50 ? "#fbbf24" : "#f87171",
-                      border: `1px solid ${loan.trustScore >= 75 ? "#059669" : loan.trustScore >= 50 ? "#ca8a04" : "#dc2626"}`
-                    }}>
-                      {loan.trustScore}
-                    </span>
-                  </td>
-                  <td style={{ ...styles.td, fontWeight: '700', color: '#fff' }}>
-                    {loan.amountEth} <span style={{ color: '#60a5fa', fontSize: '11px' }}>ETH</span>
-                  </td>
-                  <td style={styles.td}>{loan.interestRate}%</td>
-                  <td style={styles.td}>{loan.safetyFee}%</td>
-                  <td style={styles.td}>{Math.floor(loan.duration / 86400)} Days</td>
-                  <td style={styles.td}>
-                    <span style={styles.badge(getLoanStatus(loan))}>
-                      {getLoanStatus(loan)}
-                    </span>
-                  </td>
-                  <td style={{ ...styles.td, borderRight: "1px solid #1e293b", borderTopRightRadius: "8px", borderBottomRightRadius: "8px", textAlign: 'right' }}>
-                    <button 
-                      onClick={() => lendLoan(loan)} 
-                      style={styles.btn("#2563eb")}
-                      onMouseOver={(e) => e.target.style.opacity = '0.8'}
-                      onMouseOut={(e) => e.target.style.opacity = '1'}
-                    >
-                      Lend Funds
-                    </button>
-                  </td>
+        {loading ? (
+          <div className="text-center py-10 text-slate-500">
+            <div className="spinner">Loading loans...</div>
+          </div>
+        ) : loans.length === 0 ? (
+          <p className="text-center py-10 text-slate-500">
+            No loan requests found in the smart contract.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-separate border-spacing-y-2">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3 text-left text-slate-400 text-xs uppercase font-bold border-b border-slate-800">
+                    Loan ID
+                  </th>
+                  <th className="px-4 py-3 text-left text-slate-400 text-xs uppercase font-bold border-b border-slate-800">
+                    Borrower
+                  </th>
+                  <th className="px-4 py-3 text-left text-slate-400 text-xs uppercase font-bold border-b border-slate-800">
+                    Amount
+                  </th>
+                  <th className="px-4 py-3 text-left text-slate-400 text-xs uppercase font-bold border-b border-slate-800">
+                    Interest
+                  </th>
+                  <th className="px-4 py-3 text-left text-slate-400 text-xs uppercase font-bold border-b border-slate-800">
+                    Duration
+                  </th>
+                  <th className="px-4 py-3 text-left text-slate-400 text-xs uppercase font-bold border-b border-slate-800">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-right text-slate-400 text-xs uppercase font-bold border-b border-slate-800">
+                    Action
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+              </thead>
+              <tbody>
+                {loans.map((loan) => (
+                  <tr
+                    key={loan.loanId}
+                    className="bg-slate-900 transition-transform hover:scale-[1.01]"
+                  >
+                    <td className="px-4 py-4 text-sm border-t border-b border-l border-slate-800 rounded-l-lg">
+                      #{loan.loanId}
+                    </td>
+                    <td className="px-4 py-4 text-sm border-t border-b border-slate-800">
+                      <span className="font-mono bg-slate-800 px-2 py-1 rounded-md text-sky-400">
+                        {loan.borrower.slice(0, 6)}...
+                        {loan.borrower.slice(-4)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-sm font-bold text-white border-t border-b border-slate-800">
+                      {loan.amountEth}{" "}
+                      <span className="text-blue-400 text-xs">ETH</span>
+                    </td>
+                    <td className="px-4 py-4 text-sm border-t border-b border-slate-800">
+                      {loan.interestRate}%
+                    </td>
+                    <td className="px-4 py-4 text-sm border-t border-b border-slate-800">
+                      {Math.floor(loan.duration / 86400)} Days
+                    </td>
+                    <td className="px-4 py-4 text-sm border-t border-b border-slate-800">
+                      <span
+                        className={`px-2.5 py-1 rounded-xl text-xs font-semibold border ${
+                          getLoanStatus(loan) === "Active"
+                            ? "bg-emerald-900 text-emerald-400 border-emerald-600"
+                            : "bg-slate-800 text-slate-400 border-slate-600"
+                        }`}
+                      >
+                        {getLoanStatus(loan)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-right border-t border-b border-r border-slate-800 rounded-r-lg">
+                      {!loan.funded && (
+                        <button
+                          onClick={() => openLendingModal(loan)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold text-xs hover:opacity-80 transition-opacity shadow-lg"
+                        >
+                          Lend Funds
+                        </button>
+                      )}
+
+                      {loan.funded && !loan.withdrawn && !loan.repaid && (
+                        <button
+                          onClick={() => withdrawLoan(loan)}
+                          className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold text-xs hover:opacity-80 transition-opacity shadow-lg"
+                        >
+                          Withdraw
+                        </button>
+                      )}
+
+                      {loan.withdrawn && !loan.repaid && (
+                        <button
+                          onClick={() => repayLoan(loan)}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-lg font-semibold text-xs hover:opacity-80 transition-opacity shadow-lg"
+                        >
+                          Repay Loan
+                        </button>
+                      )}
+
+                      {loan.repaid && (
+                        <span className="text-emerald-500 font-semibold">
+                          <i className="mr-1">✓</i> Settled
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 🔥 LENDING MODE MODAL */}
+        {showLendingModal && selectedLoan && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+            onClick={closeLendingModal}
+          >
+            <div
+              className="bg-slate-900 rounded-2xl p-8 w-11/12 max-w-lg border border-slate-800 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-semibold text-blue-400 mb-2">
+                Choose Lending Mode
+              </h3>
+              <p className="text-sm text-slate-400 mb-6">
+                Select how you want to fund this loan
+              </p>
+
+              {/* Loan Details */}
+              <div className="bg-slate-800 p-4 rounded-xl mb-6 border border-slate-700">
+                <div className="flex justify-between mb-2 text-sm">
+                  <span className="text-slate-400">Loan Amount:</span>
+                  <span className="text-slate-200 font-semibold">
+                    {selectedLoan.amountEth} ETH
+                  </span>
+                </div>
+                <div className="flex justify-between mb-2 text-sm">
+                  <span className="text-slate-400">Interest Rate:</span>
+                  <span className="text-slate-200 font-semibold">
+                    {selectedLoan.interestRate}%
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Duration:</span>
+                  <span className="text-slate-200 font-semibold">
+                    {Math.floor(selectedLoan.duration / 86400)} Days
+                  </span>
+                </div>
+              </div>
+
+              {/* Option 1: Individual Lending */}
+              <button
+                onClick={() => lendIndividually(selectedLoan)}
+                className="w-full p-4 mb-3 bg-slate-800 border-2 border-slate-700 rounded-xl text-left hover:border-blue-400 hover:bg-slate-800 transition-all"
+              >
+                <div className="flex items-center gap-2 text-base text-blue-400 font-semibold mb-1">
+                  <span>👤</span> Lend Individually
+                </div>
+                <div className="text-sm text-slate-400 font-normal">
+                  Fund the loan directly. You receive 100% of the interest when
+                  repaid.
+                </div>
+              </button>
+
+              {/* Option 2: Safety Pool Lending */}
+              <button
+                onClick={() => lendViaSafetyPool(selectedLoan)}
+                className="w-full p-4 mb-3 bg-slate-800 border-2 border-slate-700 rounded-xl text-left hover:border-emerald-500 hover:bg-slate-800 transition-all"
+              >
+                <div className="flex items-center gap-2 text-base text-blue-400 font-semibold mb-1">
+                  <span>🛡️</span> Lend via Safety Pool
+                </div>
+                <div className="text-sm text-slate-400 font-normal">
+                  Community-backed lending. You get 90% profit + default
+                  protection from pool members.
+                </div>
+              </button>
+
+              {/* Cancel Button */}
+              <button
+                onClick={closeLendingModal}
+                className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 font-semibold text-sm hover:bg-slate-950 transition-colors mt-2"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
