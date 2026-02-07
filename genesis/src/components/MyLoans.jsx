@@ -93,21 +93,30 @@ export default function MyLoans({ walletAddress }) {
 
       const rawLoans = await loanManager.getLoans();
 
-      const allLoans = rawLoans.map((loan, index) => ({
-        loanId: index,
-        borrower: loan.borrower,
-        lender: loan.lender,
-        amountWei: loan.amount,
-        amountEth: ethers.formatEther(loan.amount),
-        interestRate: (Number(loan.interestRate) / 100).toFixed(2),
-        safetyFee: (Number(loan.safetyFee) / 100).toFixed(2),
-        duration: Number(loan.duration),
-        createdAt: new Date(Number(loan.createdAt) * 1000).toLocaleString(),
-        funded: loan.funded,
-        repaid: loan.repaid,
-        withdrawn: loan.withdrawn,
-        defaulted: loan.defaulted,
-      }));
+      const allLoans = rawLoans.map((loan, index) => {
+        const createdAtTimestamp = Number(loan.createdAt) * 1000;
+        const durationMs = Number(loan.duration) * 1000;
+        const dueDate = new Date(createdAtTimestamp + durationMs);
+        const isOverdue = Date.now() > dueDate.getTime() && !loan.repaid;
+        
+        return {
+          loanId: index,
+          borrower: loan.borrower,
+          lender: loan.lender,
+          amountWei: loan.amount,
+          amountEth: ethers.formatEther(loan.amount),
+          interestRate: (Number(loan.interestRate) / 100).toFixed(2),
+          safetyFee: (Number(loan.safetyFee) / 100).toFixed(2),
+          duration: Number(loan.duration),
+          createdAt: new Date(createdAtTimestamp).toLocaleString(),
+          dueDate: dueDate.toLocaleDateString(),
+          isOverdue: isOverdue,
+          funded: loan.funded,
+          repaid: loan.repaid,
+          withdrawn: loan.withdrawn,
+          defaulted: loan.defaulted,
+        };
+      });
 
       // Filter loans where user is borrower
       const borrowed = allLoans.filter(
@@ -200,7 +209,7 @@ export default function MyLoans({ walletAddress }) {
                 <th style={styles.th}>Amount</th>
                 <th style={styles.th}>Interest</th>
                 <th style={styles.th}>Safety Fee</th>
-                <th style={styles.th}>Duration</th>
+                <th style={styles.th}>Due Date</th>
                 <th style={styles.th}>Status</th>
                 <th style={styles.th}>Action</th>
               </tr>
@@ -212,7 +221,14 @@ export default function MyLoans({ walletAddress }) {
                   <td style={styles.td}>{loan.amountEth} ETH</td>
                   <td style={styles.td}>{loan.interestRate}%</td>
                   <td style={styles.td}>{loan.safetyFee}%</td>
-                  <td style={styles.td}>{Math.floor(loan.duration / 86400)} Days</td>
+                  <td style={{
+                    ...styles.td,
+                    color: loan.isOverdue ? '#f87171' : '#e2e8f0',
+                    fontWeight: loan.isOverdue ? '700' : '400'
+                  }}>
+                    {loan.dueDate}
+                    {loan.isOverdue && !loan.repaid && <span style={{ marginLeft: '6px', color: '#f87171' }}>⚠️</span>}
+                  </td>
                   <td style={styles.td}>
                     <span style={styles.badge(getLoanStatus(loan))}>
                       {getLoanStatus(loan)}
@@ -251,6 +267,7 @@ export default function MyLoans({ walletAddress }) {
                 <th style={styles.th}>Borrower</th>
                 <th style={styles.th}>Amount</th>
                 <th style={styles.th}>Interest</th>
+                <th style={styles.th}>Due Date</th>
                 <th style={styles.th}>Status</th>
                 <th style={styles.th}>Returns</th>
               </tr>
@@ -270,6 +287,14 @@ export default function MyLoans({ walletAddress }) {
                     </td>
                     <td style={styles.td}>{loan.amountEth} ETH</td>
                     <td style={styles.td}>{loan.interestRate}%</td>
+                    <td style={{
+                      ...styles.td,
+                      color: loan.isOverdue ? '#f87171' : '#e2e8f0',
+                      fontWeight: loan.isOverdue ? '700' : '400'
+                    }}>
+                      {loan.dueDate}
+                      {loan.isOverdue && !loan.repaid && <span style={{ marginLeft: '6px', color: '#f87171' }}>⚠️</span>}
+                    </td>
                     <td style={styles.td}>
                       <span style={styles.badge(getLoanStatus(loan))}>
                         {getLoanStatus(loan)}
